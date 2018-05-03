@@ -21,18 +21,18 @@ def run_assignment():
     labels = np.array(labels[np.logical_or.reduce([labels==x for x in targetdigits])])
     
     #Question 1
-    kohonen(data, labels)
-    
-    #Question 2
-    kohonen(data, labels, display_label=True)
-    
-    #Question 3
-    sizes = [6,8,10]
-    sigmas = [1,3,5,7]
-    
-    for size in sizes:
-        for sigma in sigmas:
-            kohonen(data, labels, filter_size=size, neighbourhood_width=sigma, n_epochs = 50)
+#    kohonen(data, labels)
+#    
+#    #Question 2
+#    kohonen(data, labels, display_label=True)
+#    
+#    #Question 3
+#    sizes = [6,8,10]
+#    sigmas = [1,3,5,7]
+#    
+#    for size in sizes:
+#        for sigma in sigmas:
+#            kohonen(data, labels, filter_size=size, neighbourhood_width=sigma, n_epochs = 25
     
     #Question 4
     kohonen_sigma_decay(data, labels, filter_size=8, n_epochs = 25, display_label=True)
@@ -67,19 +67,19 @@ def kohonen(data, labels, filter_size = 6, neighbourhood_width = 3.0, display_la
     num_epochs = n_epochs
     #set the maximal iteration count
     
-    weight_changes = np.zeros(num_epochs)
+    quantization_errors = np.zeros(num_epochs)
     
     for epoch in range(num_epochs):
         #set the random order in which the datapoints should be presented
         i_random = np.arange(np.shape(data)[0])
         np.random.shuffle(i_random)
-        mean_change = 0;
+        mean_error = 0;
         for t, i in enumerate(i_random):
-            mean_change += som_step(centers, data[i,:],neighbor,eta,sigma)
+            mean_error += som_step(centers, data[i,:],neighbor,eta,sigma)
         
-        mean_change /= np.shape(data)[0]*eta
-        print(mean_change)
-        weight_changes[epoch] = mean_change
+        mean_error /= np.shape(data)[0]
+        print(mean_error)
+        quantization_errors[epoch] = mean_error
 
     # for visualization, you can use this:
     for i in range(1, size_k**2+1):
@@ -95,9 +95,9 @@ def kohonen(data, labels, filter_size = 6, neighbourhood_width = 3.0, display_la
     else:
         plb.savefig('proto_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
         plb.figure()
-        plb.plot(range(1,num_epochs+1),weight_changes)
+        plb.plot(range(1,num_epochs+1),quantization_errors)
         plb.xlabel('Number of epochs')
-        plb.ylabel('Mean change in centers')
+        plb.ylabel('Mean weighted quantization error')
         plb.savefig('weights_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
     # leave the window open at the end of the loop
     plb.show()
@@ -135,21 +135,22 @@ def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_
     num_epochs = n_epochs
     #set the maximal iteration count
     
-    weight_changes = np.zeros(num_epochs)
+    quantization_errors = np.zeros(num_epochs)
     
     for epoch in range(num_epochs):
         #set the random order in which the datapoints should be presented
         i_random = np.arange(np.shape(data)[0])
         np.random.shuffle(i_random)
-        mean_change = 0
+        mean_error = 0
         sigma = sigma_0*np.exp(-counter/tau)
+        print('Sigma '+str(sigma))
         for t, i in enumerate(i_random):
-            mean_change += som_step(centers, data[i,:],neighbor,eta,sigma)
+            mean_error += som_step(centers, data[i,:],neighbor,eta,sigma)
             counter += 1
         
-        mean_change /= np.shape(data)[0]*eta
-        print(mean_change)
-        weight_changes[epoch] = mean_change
+        mean_error /= np.shape(data)[0]
+        print(mean_error)
+        quantization_errors[epoch] = mean_error
 
     # for visualization, you can use this:
     for i in range(1, size_k**2+1):
@@ -165,9 +166,9 @@ def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_
     else:
         plb.savefig('decay_proto_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
         plb.figure()
-        plb.plot(range(1,num_epochs+1),weight_changes)
+        plb.plot(range(1,num_epochs+1),quantization_errors)
         plb.xlabel('Number of epochs')
-        plb.ylabel('Mean change in centers')
+        plb.ylabel('Mean weighted quantization error')
         plb.savefig('decay_weights_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
     # leave the window open at the end of the loop
     plb.show()
@@ -209,7 +210,7 @@ def som_step(centers,data,neighbor,eta,sigma):
 
     # find coordinates of the winner
     a,b = np.nonzero(neighbor == b)
-    delta_centers = np.zeros(size_k**2)
+    quantization_error = np.zeros(size_k**2)
         
     # update all units
     for j in range(size_k**2):
@@ -218,10 +219,10 @@ def som_step(centers,data,neighbor,eta,sigma):
         # calculate the distance and discounting factor
         disc=gauss(np.sqrt((a-a1)**2+(b-b1)**2),[0, sigma])
         # update weights        
-        delta_centers[j] = np.linalg.norm(disc * eta * (data - centers[j,:]))
+        quantization_error[j] = np.linalg.norm(disc * (data - centers[j,:]))
         centers[j,:] += disc * eta * (data - centers[j,:])
     
-    return np.mean(delta_centers)
+    return np.mean(quantization_error)
 
 def gauss(x,p):
     """Return the gauss function N(x), with mean p[0] and std p[1].

@@ -20,25 +20,38 @@ def run_assignment():
     data = data[np.logical_or.reduce([labels==x for x in targetdigits]),:]
     labels = np.array(labels[np.logical_or.reduce([labels==x for x in targetdigits])])
     
+#    q_errors = np.zeros((25,5))
     #Question 1
+#    for i,eta in enumerate(np.logspace(-4,0,5)):
+#        centers, q_errors[:,i] = kohonen(data, labels, lr = eta, n_epochs = 25)
+#
+#    plb.figure()    
+#    plb.plot(range(1,25+1),q_errors)    
+#    plb.xlabel('Number of epochs')
+#    plb.ylabel('Mean weighted quantization error')
+#    plb.legend(np.logspace(-4,0,5))
+#    plb.show()
+    
+    #Question 2
 #    kohonen(data, labels)
+    
+    #Question 3
+#    kohonen(data, labels, display_label=True, n_epochs=25)
 #    
-#    #Question 2
-#    kohonen(data, labels, display_label=True)
-#    
-#    #Question 3
+#    #Question 4
 #    sizes = [6,8,10]
 #    sigmas = [1,3,5,7]
+#    q_errors = np.zeros((25,3,4))
+#    for i,size in enumerate(sizes):
+#        for j,sigma in enumerate(sigmas):
+#            c, q_errors[:,i,j] = kohonen(data, labels, filter_size=size, neighbourhood_width=sigma, n_epochs = 25)
+#    np.save('q4_learning_curves',q_errors)
 #    
-#    for size in sizes:
-#        for sigma in sigmas:
-#            kohonen(data, labels, filter_size=size, neighbourhood_width=sigma, n_epochs = 25
-    
-    #Question 4
+#    #Question 5
     kohonen_sigma_decay(data, labels, filter_size=8, n_epochs = 25, display_label=True)
 
 
-def kohonen(data, labels, filter_size = 6, neighbourhood_width = 3.0, display_label = False, n_epochs = 100):
+def kohonen(data, labels, filter_size = 6, neighbourhood_width = 3.0, display_label = False, n_epochs = 100, lr = 0.001):
     """Example for using create_data, plot_data and som_step.
     """
     plb.close('all')
@@ -62,7 +75,7 @@ def kohonen(data, labels, filter_size = 6, neighbourhood_width = 3.0, display_la
     neighbor = np.arange(size_k**2).reshape((size_k, size_k))
 
     #set the learning rate
-    eta = 0.001 # HERE YOU HAVE TO SET YOUR OWN LEARNING RATE
+    eta = lr # HERE YOU HAVE TO SET YOUR OWN LEARNING RATE
     
     num_epochs = n_epochs
     #set the maximal iteration count
@@ -82,29 +95,30 @@ def kohonen(data, labels, filter_size = 6, neighbourhood_width = 3.0, display_la
         quantization_errors[epoch] = mean_error
 
     # for visualization, you can use this:
-    for i in range(1, size_k**2+1):
-        ax = plb.subplot(size_k,size_k,i)
-        plb.imshow(np.reshape(centers[i-1,:], [28, 28]),interpolation='bilinear')
-        if display_label:
-            ax.set_title('label ' + str(assign_label(centers[i-1,:],data,labels)))
-        plb.axis('off')
-    
-    if display_label:
-        plb.subplots_adjust(hspace=1.0)
-        plb.savefig('labeled_proto_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
-    else:
-        plb.savefig('proto_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
-        plb.figure()
-        plb.plot(range(1,num_epochs+1),quantization_errors)
-        plb.xlabel('Number of epochs')
-        plb.ylabel('Mean weighted quantization error')
-        plb.savefig('weights_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
+#    for i in range(1, size_k**2+1):
+#        ax = plb.subplot(size_k,size_k,i)
+#        plb.imshow(np.reshape(centers[i-1,:], [28, 28]),interpolation='bilinear')
+#        if display_label:
+#            ax.set_title('label ' + str(assign_label(centers[i-1,:],data,labels)))
+#        plb.axis('off')
+#    
+#    if display_label:
+#        plb.subplots_adjust(hspace=1.0)
+#        plb.savefig('labeled_proto_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
+#    else:
+#        plb.savefig('proto_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
+#        plb.figure()
+#        plb.plot(range(1,num_epochs+1),quantization_errors)
+#        plb.xlabel('Number of epochs')
+#        plb.ylabel('Mean weighted quantization error')
+#        plb.savefig('weights_sigma_'+str(int(sigma))+'_k_'+str(size_k)+'.png')
     # leave the window open at the end of the loop
     plb.show()
     plb.draw()
+    return centers, quantization_errors
 
 
-def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_epochs = 100):
+def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_epochs = 100, lr = 0.001):
     """Example for using create_data, plot_data and som_step.
     """
     plb.close('all')
@@ -121,7 +135,7 @@ def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_
     #describes it
     sigma_0 = filter_size/2
     counter = 0
-    tau = 10000/np.log(sigma_0)
+    tau = 20000/np.log(sigma_0)
     
     #initialise the centers randomly
     centers = np.random.rand(size_k**2, dim) * data_range
@@ -130,7 +144,7 @@ def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_
     neighbor = np.arange(size_k**2).reshape((size_k, size_k))
 
     #set the learning rate
-    eta = 0.001 # HERE YOU HAVE TO SET YOUR OWN LEARNING RATE
+    eta = lr # HERE YOU HAVE TO SET YOUR OWN LEARNING RATE
     
     num_epochs = n_epochs
     #set the maximal iteration count
@@ -173,6 +187,7 @@ def kohonen_sigma_decay(data, labels, filter_size = 6, display_label = False, n_
     # leave the window open at the end of the loop
     plb.show()
     plb.draw()
+    return centers, quantization_errors
 
 
 def assign_label(center, data, labels):

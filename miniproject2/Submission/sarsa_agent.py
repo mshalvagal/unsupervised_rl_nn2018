@@ -35,7 +35,6 @@ class SarsaAgent():
         xcenters = np.linspace(-150,30,grid_size+1,False)[1:]
         xdcenters = np.linspace(-15,15,grid_size+1,False)[1:]
         self.centers = np.array(np.meshgrid(xcenters,np.flip(xdcenters,axis=0)))
-#         self.centers = np.array(np.meshgrid(xcenters,xdcenters))
         
         self.sigma = np.zeros(2)
         self.sigma[0] = xcenters[1]-xcenters[0]
@@ -54,7 +53,7 @@ class SarsaAgent():
         self.q1 = 0.0
         
 
-    def learn_task(self, n_episodes = 200, n_steps = 2000):
+    def learn_task(self, n_episodes = 200, n_steps = 2000, temperature_decay=False):
         """Run trials and learn, without display.
 
         Parameters
@@ -70,12 +69,20 @@ class SarsaAgent():
             self.mountain_car.reset()
             self.eligibility_traces.fill(0.0)
             
+            if temperature_decay:
+                self.temperature *= np.exp(-1/100)
+            
             # simulate the first timestep
             q, self.activations = self.action_values()
-            p = np.exp(q/self.temperature)/sum(np.exp(q/self.temperature))
-            # choose the action with a softmax
-            self.a = np.random.choice(3,p=p)
-            self.q = q[self.a]
+            if self.temperature==0:
+              # choose the greedy action
+              self.a = np.argmax(q)
+              self.q = q[self.a]
+            else:
+              p = np.exp(q/self.temperature)/sum(np.exp(q/self.temperature))
+              # choose the action with a softmax
+              self.a = np.random.choice(3,p=p)
+              self.q = q[self.a]
     
             for n in range(n_steps):
                 
@@ -84,11 +91,16 @@ class SarsaAgent():
                 self.mountain_car.simulate_timesteps(100, 0.01)
                 self.r = self.mountain_car.R
                 q1, self.activations1 = self.action_values()
-                p = np.exp(q1/self.temperature)/sum(np.exp(q1/self.temperature))
-                
-                # choose the action with a softmax
-                self.a1 = np.random.choice(3,p=p)
-                self.q1 = q1[self.a1]
+                if self.temperature==0:
+                  # choose the greedy action
+                  self.a1 = np.argmax(q1)
+                  self.q1 = q1[self.a]
+                else:
+                  p = np.exp(q1/self.temperature)/sum(np.exp(q1/self.temperature))
+
+                  # choose the action with a softmax
+                  self.a1 = np.random.choice(3,p=p)
+                  self.q1 = q1[self.a1]
                 
                 #learning step
                 self.learn()
@@ -140,11 +152,28 @@ class SarsaAgent():
         labels = labels.flatten()
         
         plt.figure()
-        plt.quiver(xcenters,xdcenters,labels,np.zeros_like(labels),np.arctan2(np.zeros_like(labels), labels),pivot='middle', cmap = 'Dark2')
+        plt.quiver(xcenters,xdcenters,labels,np.zeros_like(labels),np.arctan2(np.zeros_like(labels), labels),pivot='middle', cmap = 'Dark2',scale_units='width')
         plt.xlabel('Position',fontsize=15)
         plt.ylabel('Velocity',fontsize=15)
         
     
+    def visualize_values(self):
+        values = np.zeros_like(self.activations)
+        
+        for ix,iy in np.ndindex(self.activations.shape):
+            q, _ = self.action_values(x=self.centers[0,ix,iy],x_d=self.centers[1,ix,iy])
+            values[ix,iy] = np.max(q)
+        
+        xcenters = self.centers[0].flatten()
+        xdcenters = self.centers[1].flatten()
+        values = values.flatten()
+        
+        plt.figure()
+        plt.scatter(xcenters,xdcenters,s=values*plt.rcParams['lines.markersize'] ** 2)
+        plt.xlabel('Position',fontsize=15)
+        plt.ylabel('Velocity',fontsize=15)
+   
+  
     def visualize_trial(self, n_steps = 200):
         """Do a trial without learning, with display.
 
@@ -183,33 +212,42 @@ class SarsaAgent():
                 print("\rreward obtained at t = ", self.mountain_car.t)
                 break
 
-
-n_episodes = 100
+#Question 1
+n_episodes = 200
 latency = np.zeros((10,n_episodes))
+
 for i in range(10):
-    print('Trial ', i)
-    d = SarsaAgent(weight_init = 'constant', learning_rate=0.01, temperature=0.01, trace_decay_rate = 0.99, grid_size=20)
-    latency[i,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000)
-  
+  print('Trial ', i)
+  d = SarsaAgent(weight_init = 'constant', learning_rate=0.01, temperature=0.01, trace_decay_rate = 0.99, grid_size=20)
+  latency[i,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000)
+
+plt.figure()
 plt.plot(np.mean(latency,axis=0),linewidth=2.0)
 plt.grid()
 plt.xlabel('Episodes',fontsize=15)
 plt.ylabel('Average Escape Latency',fontsize=15)
-d.visualize_trial()
+
+d.visualize_trial(n_steps = 80)
 plb.show()
 
 
 #Question 2
+n_episodes = 125
+
 d = SarsaAgent(weight_init = 'constant', learning_rate=0.01, temperature=0.01, trace_decay_rate = 0.99, grid_size=20)
 d.visualize_policy()
+
 for i in range(int(n_episodes/25)):
   d.learn_task(n_episodes = 25, n_steps = 3000)
   d.visualize_policy()
   
+d.visualize_values()
+
+
 #Question 3
-temperature_range = [0.01,0.1,1.0]
-n_episodes = 100
-latency = np.zeros((4,n_episodes))
+temperature_range = [0,0.01,0.1]
+n_episodes = 200
+latency = np.zeros((3,n_episodes))
 
 for j,t in enumerate(temperature_range):
   local_variable = np.zeros((5,n_episodes))
@@ -219,7 +257,79 @@ for j,t in enumerate(temperature_range):
     local_variable[j,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000)
   latency[j,:] = np.mean(local_variable,axis=0)
   
-plt.plot(latency[:-2].T)
-plt.legend(['Temperature = 0.01','Temperature = 0.1'])
-plt.xlabel('Episodes')
-plt.ylabel('Escape latency')
+plt.figure()
+plt.plot(np.flipud(latency).T,linewidth=2.0)
+plt.grid()
+plt.legend(['Temperature = 0.1','Temperature = 0.01','Temperature = 0'],fontsize=15)
+plt.xlabel('Episodes',fontsize=15)
+plt.ylabel('Escape latency',fontsize=15)
+
+for i in range(5):
+  print('Trial ',i)
+  d = SarsaAgent(weight_init = 'constant', learning_rate=0.01, temperature=0.1, trace_decay_rate = 0.99, grid_size=20)
+  local_variable[j,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000, temperature_decay=True)
+latency_decay = np.mean(local_variable, axis=0)
+
+plt.figure()
+plt.plot(latency_decay.T,linewidth=2.0)
+plt.plot(latency[1].T,linewidth=2.0)
+plt.grid()
+plt.legend([r'Temperature = 0.1$\times \exp{-\frac{episode}{100}}$','Temperature = 0.01'],fontsize=15)
+plt.xlabel('Episodes',fontsize=15)
+plt.ylabel('Escape latency',fontsize=15)
+
+
+#Question 4
+trace_decay_range = [0.0,0.75,0.99]
+n_episodes = 200
+latency = np.zeros((3,n_episodes))
+
+for j,t in enumerate(trace_decay_range):
+  local_variable = np.zeros((5,n_episodes))
+  for i in range(5):
+    print('Trace decay rate ', t, ' Trial ',i)
+    d = SarsaAgent(weight_init = 'constant', learning_rate=0.01, temperature=0.01, trace_decay_rate = t, grid_size=20)
+    local_variable[j,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000)
+  latency[j,:] = np.mean(local_variable,axis=0)
+  
+plt.figure()
+plt.plot(latency.T,linewidth=2.0)
+plt.grid()
+plt.legend([r'$\lambda=0$',r'$\lambda=0.75$',r'$\lambda=0.99$'],fontsize=15)
+plt.xlabel('Episodes',fontsize=15)
+plt.ylabel('Escape latency',fontsize=15)
+
+
+#Question 5
+weight_range = [0.0,0.5,1.0]
+n_episodes = 200
+latency = np.zeros((3,n_episodes))
+
+for j,t in enumerate(weight_range):
+  local_variable = np.zeros((5,n_episodes))
+  for i in range(5):
+    print('Weight ', t, ' Trial ',i)
+    d = SarsaAgent(weight_init = 'constant', learning_rate=0.01, temperature=0.01, trace_decay_rate = 0.99, grid_size=20, weight = t)
+    local_variable[j,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000)
+  latency[j,:] = np.mean(local_variable,axis=0)
+  
+plt.figure()
+plt.plot(latency.T,linewidth=2.0)
+plt.grid()
+plt.legend(['w = 0.0','w = 0.5','w = 1.0'],fontsize=15)
+plt.xlabel('Episodes',fontsize=15)
+plt.ylabel('Escape latency',fontsize=15)
+
+for i in range(1):
+  print('Trial ',i)
+  d = SarsaAgent(weight_init = 'uniform', learning_rate=0.01, temperature=0.0, trace_decay_rate = 0.99, grid_size=20)
+  local_variable[j,:] = d.learn_task(n_episodes = n_episodes, n_steps = 3000)
+latency_random = np.mean(local_variable, axis=0)
+
+plt.figure()
+plt.plot(latency[1].T,linewidth=2.0)
+plt.plot(latency_random.T,linewidth=2.0)
+plt.grid()
+plt.legend(['w = 0.5','Random initialization'],fontsize=15)
+plt.xlabel('Episodes',fontsize=15)
+plt.ylabel('Escape latency',fontsize=15)
